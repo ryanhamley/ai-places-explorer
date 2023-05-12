@@ -114,14 +114,16 @@ a, a:hover, a:visited {
     opacity: 0.9;
 }
 
-.step div {
-    padding:  25px 50px;
-    line-height: 25px;
-    font-size: 13px;
-}
-
 .step img {
     width: 100%;
+}
+
+.card-image {
+    padding: 25px 25px 0 25px;
+}
+
+.card-footer {
+    padding: 15px;
 }
 
 @media (max-width: 750px) {

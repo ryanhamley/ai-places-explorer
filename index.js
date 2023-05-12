@@ -89,7 +89,11 @@ const submitPrompt = async (prompt) => {
         // });
         // console.log(response);
         
-        await createFeatures(dummyData);
+        const fsqPlace = await getFSQPlacesMatch(dummyData[0]);
+        console.log('fsqData', fsqPlace);
+        const photoURL = await getFSQPhotoURL(fsqPlace.place.fsq_id);
+        console.log(photoURL);
+        createFeatures(dummyData, photoURL);
         initMap([dummyData[0].longitude, dummyData[0].latitude])
         overlay.style.display = 'none';
         // console.log(response.data.choices[0].text)
@@ -150,11 +154,11 @@ const initScroll = (map) => {
     });
 }
 
-const createFeatures = (features) => {
+const createFeatures = (features, photoUrl) => {
     const fragment = new DocumentFragment();
 
     features.forEach((feature, idx) => {
-        const card = createCard(feature, idx);
+        const card = createCard(feature, idx, photoUrl);
         console.log('card', card);
 
         fragment.appendChild(card);
@@ -192,16 +196,24 @@ const fetchFSQData = async (url) => {
     return data;
 }
 
-const createCard = (feature, idx) => {
+const fetchLongerDescription = async (e) => {
+    console.log('longer description', e);
+    console.log('src', e.srcElement.dataset)
+    console.log('parent', e.srcElement.parentElement.dataset);
+    const name = e.srcElement.dataset.name || e.srcElement.parentElement.dataset.name;
+    const response = await openai.createCompletion({
+        model: "text-davinci-003",
+        prompt: `Tell me more about ${name}`,
+        temperature: 0,
+        max_tokens: 1000
+    });
+    console.log('response', response);
+}
+
+const createCard = (feature, idx, photoUrl) => {
     const card = document.createElement('div');
-    card.classList.add('card', 'step', 'lefty');
-    if (idx === 0) {
-        card.classList.add('active');
-        // const fsqPlace = await getFSQPlacesMatch(feature);
-        // console.log('fsqData', fsqPlace);
-        // const photoURL = await getFSQPhotoURL(fsqPlace.place.fsq_id);
-        // console.log(photoURL);
-    }
+    card.classList.add('card', 'step', 'lefty', 'has-text-centered');
+    if (idx === 0) card.classList.add('active');
     card.id = `card-${idx}`;
 
     const cardImage = document.createElement('div');
@@ -211,7 +223,7 @@ const createCard = (feature, idx) => {
     figure.classList.add('image', 'is-4by3');
 
     const image = document.createElement('img');
-    image.src = 'https://bulma.io/images/placeholders/1280x960.png';
+    image.src = idx === 0 ? photoUrl : 'https://bulma.io/images/placeholders/1280x960.png';
     image.alt = 'Placeholder text';
 
     figure.appendChild(image);
@@ -220,14 +232,32 @@ const createCard = (feature, idx) => {
     const cardContent = document.createElement('div');
     cardContent.classList.add('card-content');
 
+    const title = document.createElement('p');
+    title.classList.add('title');
+    title.innerText = feature.name;
+
     const content = document.createElement('div');
     content.classList.add('content');
     content.innerHTML = feature.description;
 
+    cardContent.appendChild(title);
     cardContent.appendChild(content);
+
+    const footer = document.createElement('div');
+    footer.setAttribute('data-name', feature.name);
+    footer.classList.add('card-footer');
+    footer.style.cursor = 'pointer';
+    
+    const footerContent = document.createElement('p');
+    footerContent.classList.add('card-footer-item');
+    footerContent.innerText = `Click here to learn more about ${feature.name}`;
+
+    footer.appendChild(footerContent);
+    footer.addEventListener('click', fetchLongerDescription);
 
     card.appendChild(cardImage);
     card.appendChild(cardContent);
+    card.appendChild(footer);
 
     return card;
 };
