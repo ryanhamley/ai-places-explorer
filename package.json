@@ -1,0 +1,24 @@
+{
+  "name": "itinerary-planner",
+  "version": "1.0.0",
+  "description": "A ChatGPT-based itinerary planner and mapper",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "dev": "npx parcel index.html",
+    "test": "test"
+  },
+  "author": "Ryan Hamley",
+  "license": "ISC",
+  "dependencies": {
+    "bulma": "^0.9.4",
+    "intersection-observer": "^0.12.2",
+    "mapbox-gl": "^2.14.1",
+    "openai": "^3.2.1",
+    "scrollama": "^3.2.0"
+  },
+  "devDependencies": {
+    "parcel": "^2.8.3",
+    "process": "^0.11.10"
+  }
+}
