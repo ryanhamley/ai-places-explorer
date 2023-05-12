@@ -23,17 +23,17 @@ a, a:hover, a:visited {
     align-items: center;
 }
 
+#overlay span {
+    width: 25%;
+    display: none;
+}
+
+#overlay span p {
+    margin-bottom: 12px;
+}
+
 .button.is-link {
     background-color: #0071bc;
-}
-
-#loading-text {
-    display: none;
-}
-
-.progress {
-    display: none;
-    max-width: 25%;
 }
 
 #mapInset {

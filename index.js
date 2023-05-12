@@ -4,7 +4,7 @@ import scrollama from "scrollama";
 import { Configuration, OpenAIApi } from "openai";
 
 const configuration = new Configuration({
-  apiKey: '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',
+  apiKey: process.env.OPENAI_API_KEY,
 });
 const openai = new OpenAIApi(configuration);
 
@@ -12,7 +12,8 @@ const overlay = document.getElementById("overlay");
 const promptForm = document.getElementById("prompt-form");
 const promptInput = document.getElementById("prompt");
 const submitButton = document.getElementById("submitBtn");
-const progressBar = document.querySelector('.progress');
+const loadingScreen = document.querySelector('#overlay span');
+const loadingText = document.getElementById('loading-text');
 const featuresContainer = document.getElementById("features");
 const modal = document.getElementById('modal-js-example');
 const modalContent = document.querySelector('.modal-content .box');
@@ -23,7 +24,7 @@ modalBackground.addEventListener('click', () => {
 });
 
 let marker = new mapboxgl.Marker();
-let dummyData = [];
+let openaiData = [];
 
 const cachedLongerDescriptions = {};
 
@@ -32,7 +33,7 @@ submitButton.addEventListener('click', () => {
     if (prompt) {
         const formattedPrompt = formatPrompt(prompt);
         promptForm.style.display = 'none';
-        progressBar.style.display = 'block';
+        loadingScreen.style.display = 'block';
         submitPrompt(formattedPrompt);
     }
 });
@@ -42,7 +43,7 @@ const formatPrompt = (prompt) => {
         prompt += '?';
     }
 
-    return `${prompt} Format the answer as JSON with the following properties: "name", "localName", "address", "city", "cc", "latitude", "longitude" and "description". The "localName" property should be "name" in the local language. The "cc" property should be the two-digit country code.`
+    return `${prompt} Format the answer as JSON with the following properties: "name", "localName", "address", "city", "cc", "latitude", "longitude" and "description". The "localName" property should be "name" in the language of the location's country. The "cc" property should be the two-digit country code.`
 };
 
 const submitPrompt = async (prompt) => {
@@ -53,14 +54,14 @@ const submitPrompt = async (prompt) => {
           temperature: 0,
           max_tokens: 1000,
         });
-        console.log('ChatGPT is done. Building map...');
-        dummyData = JSON.parse(response.data.choices[0].text);
-        for(let i = 0; i < dummyData.length; i++) {
-            const feature = dummyData[i];
+        loadingText.innerText = 'Building map...';
+        openaiData = JSON.parse(response.data.choices[0].text);
+        for(let i = 0; i < openaiData.length; i++) {
+            const feature = openaiData[i];
             const photoURL = await getPhotoUrl(feature);
             createFeatures(feature, i, photoURL);
         };
-        initMap([dummyData[0].longitude, dummyData[0].latitude])
+        initMap([openaiData[0].longitude, openaiData[0].latitude])
         overlay.style.display = 'none';
     } catch (error) {
         // TODO show an error screen
@@ -75,15 +76,15 @@ const submitPrompt = async (prompt) => {
 
 const getPhotoUrl = async (feature) => {
     const fsqPlace = await getFSQPlacesMatch(feature);
+    let photoURL;
     if (fsqPlace.place) {
-        const photoURL = await getFSQPhotoURL(fsqPlace.place.fsq_id);
-        return photoURL;
+        photoURL = await getFSQPhotoURL(fsqPlace.place.fsq_id);
     }
-    return 'https://bulma.io/images/placeholders/1280x960.png';
+    return photoURL || 'https://bulma.io/images/placeholders/1280x960.png';
 }
 
 const initMap = (center) => {
-    mapboxgl.accessToken = 'pk.eyJ1IjoiZm91cnNxdWFyZSIsImEiOiJjRGRqOVZZIn0.rMLhJeqI_4VnU2YdIJvD3Q';
+    mapboxgl.accessToken = process.env.MAPBOX_ACCESS_TOKEN;
     const map = new mapboxgl.Map({
         container: 'map',
         style: 'mapbox://styles/mapbox/streets-v12',
@@ -117,7 +118,7 @@ const initScroll = (map) => {
     })
     .onStepEnter(response => {
         const element = response.element;
-        const location = dummyData[response.index];
+        const location = openaiData[response.index];
         const center = [location.longitude, location.latitude];
         element.classList.add('active');
         map.flyTo({center})
@@ -139,7 +140,7 @@ const basePlacesAPIUrl = 'https://api.foursquare.com/v3/places';
 
 const getFSQPlacesMatch = async (feature) => {
     const fsqMatchURL = `${basePlacesAPIUrl}/match`;
-    const queryString = `?name=${encodeURIComponent(feature.localName)}&address=${encodeURIComponent(feature.address)}&city=${feature.city}&cc=${feature.cc}`;
+    const queryString = `?name=${encodeURIComponent(feature.name)}&address=${encodeURIComponent(feature.address)}&city=${encodeURIComponent(feature.city)}&cc=${feature.cc}`;
     const queryPlacesAPIUrl = `${fsqMatchURL}${queryString}`;
     const placesData = await fetchFSQData(queryPlacesAPIUrl);
     return placesData;
@@ -148,24 +149,28 @@ const getFSQPlacesMatch = async (feature) => {
 const getFSQPhotoURL = async (id) => {
     const fsqPhotoUrl = `${basePlacesAPIUrl}/${id}/photos`;
     const photoData = await fetchFSQData(fsqPhotoUrl);
+    if (!photoData) return;
     const photo = photoData[0];
     return `${photo.prefix}original${photo.suffix}`;
 }
 
 const fetchFSQData = async (url) => {
-    const fsqPlacesResponse = await fetch(url, {
-        headers: {
-            "Content-Type": "application/json",
-            "Authorization": "fsq3riMMk8S7FMiCwXUnMQ9ivSjXd53q0pGHwOF22UYLeno="
-        }
-    });
-
-    const data = await fsqPlacesResponse.json();
-    return data;
+    try {
+        const fsqPlacesResponse = await fetch(url, {
+            headers: {
+                "Content-Type": "application/json",
+                "Authorization": process.env.FSQ_API_KEY
+            }
+        });
+    
+        const data = await fsqPlacesResponse.json();
+        return data;
+    } catch (error) {
+        console.log(`Failed to fetch ${url}:`, error);
+    }
 }
 
 const fetchLongerDescription = async (e) => {
-    console.log('e', e);
     const footerContent = e.srcElement;
     const footer = footerContent.parentElement;
     const footerProgressBar = footer.lastChild;
