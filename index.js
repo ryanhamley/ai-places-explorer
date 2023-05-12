@@ -13,53 +13,19 @@ const promptForm = document.getElementById("prompt-form");
 const promptInput = document.getElementById("prompt");
 const submitButton = document.getElementById("submitBtn");
 const progressBar = document.querySelector('.progress');
-progressBar.style.display = 'none';
 const featuresContainer = document.getElementById("features");
+const modal = document.getElementById('modal-js-example');
+const modalContent = document.querySelector('.modal-content .box');
+const modalBackground = document.querySelector('.modal-background');
+modalBackground.addEventListener('click', () => {
+    modal.classList.remove('is-active');
+    modalContent.innerHTML = null;
+});
 
 let marker = new mapboxgl.Marker();
+let dummyData = [];
 
-const dummyData = [
-    {
-        "name": "Clerigos Tower",
-        "localName": "Torre dos Clérigos",
-        "address": "R. de São Filipe de Nery, 4050-546 Porto, Portugal",
-        "latitude": 41.145086,
-        "longitude": -8.611862,
-        "description": "The Clérigos Tower is a Baroque bell tower in the city of Porto, in Portugal. It is one of the most prominent symbols of the city and is classified as a National Monument."
-    },
-    {
-        "name": "Livraria Lello",
-        "localName": "Livraria Lello",
-        "address": "R. das Carmelitas, 144, 4050-161 Porto, Portugal",
-        "latitude": 41.147719,
-        "longitude": -8.609945,
-        "description": "Livraria Lello is a bookstore located in Porto, Portugal. It is one of the oldest bookstores in the world and is considered one of the most beautiful bookstores in the world."
-    },
-    {
-        "name": "Porto Cathedral",
-        "localName": "Sé do Porto",
-        "address": "Largo da Sé, 4050-573 Porto, Portugal",
-        "latitude": 41.144541,
-        "longitude": -8.611862,
-        "description": "The Porto Cathedral is a Roman Catholic church located in the historical center of Porto, Portugal. It is one of the city's oldest monuments and a major tourist attraction."
-    },
-    {
-        "name": "Cais da Ribeira",
-        "localName": "Cais da Ribeira",
-        "address": "R. da Ribeira, 4050-513 Porto, Portugal",
-        "latitude": 41.140045,
-        "longitude": -8.611862,
-        "description": "Cais da Ribeira is a waterfront area in the city of Porto, Portugal. It is a popular tourist destination and is known for its colorful buildings, cobblestone streets, and picturesque views of the Douro River."
-    },
-    {
-        "name": "Palácio da Bolsa",
-        "localName": "Palácio da Bolsa",
-        "address": "R. Ferreira Borges, 4050-253 Porto, Portugal",
-        "latitude": 41.145086,
-        "longitude": -8.611862,
-        "description": "The Palácio da Bolsa is a historic building in the city of Porto, Portugal. It was built in the 19th century and is now a museum and a major tourist attraction in the city."
-    }
-];
+const cachedLongerDescriptions = {};
 
 submitButton.addEventListener('click', () => {
     const prompt = promptInput.value;
@@ -76,27 +42,26 @@ const formatPrompt = (prompt) => {
         prompt += '?';
     }
 
-    return `${prompt} Format the answer as JSON with the following properties: "name", "localName", "address", "latitude", "longitude" and "description". The "localName" property should be "name" in the local language.`
+    return `${prompt} Format the answer as JSON with the following properties: "name", "localName", "address", "city", "cc", "latitude", "longitude" and "description". The "localName" property should be "name" in the local language. The "cc" property should be the two-digit country code.`
 };
 
 const submitPrompt = async (prompt) => {
     try {
-        // const response = await openai.createCompletion({
-        //   model: "text-davinci-003",
-        //   prompt,
-        //   temperature: 0,
-        //   max_tokens: 1000,
-        // });
-        // console.log(response);
-        
-        const fsqPlace = await getFSQPlacesMatch(dummyData[0]);
-        console.log('fsqData', fsqPlace);
-        const photoURL = await getFSQPhotoURL(fsqPlace.place.fsq_id);
-        console.log(photoURL);
-        createFeatures(dummyData, photoURL);
+        const response = await openai.createCompletion({
+          model: "text-davinci-003",
+          prompt,
+          temperature: 0,
+          max_tokens: 1000,
+        });
+        console.log('ChatGPT is done. Building map...');
+        dummyData = JSON.parse(response.data.choices[0].text);
+        for(let i = 0; i < dummyData.length; i++) {
+            const feature = dummyData[i];
+            const photoURL = await getPhotoUrl(feature);
+            createFeatures(feature, i, photoURL);
+        };
         initMap([dummyData[0].longitude, dummyData[0].latitude])
         overlay.style.display = 'none';
-        // console.log(response.data.choices[0].text)
     } catch (error) {
         // TODO show an error screen
         if (error.response) {
@@ -107,6 +72,15 @@ const submitPrompt = async (prompt) => {
         }
     }
 };
+
+const getPhotoUrl = async (feature) => {
+    const fsqPlace = await getFSQPlacesMatch(feature);
+    if (fsqPlace.place) {
+        const photoURL = await getFSQPhotoURL(fsqPlace.place.fsq_id);
+        return photoURL;
+    }
+    return 'https://bulma.io/images/placeholders/1280x960.png';
+}
 
 const initMap = (center) => {
     mapboxgl.accessToken = 'pk.eyJ1IjoiZm91cnNxdWFyZSIsImEiOiJjRGRqOVZZIn0.rMLhJeqI_4VnU2YdIJvD3Q';
@@ -141,7 +115,7 @@ const initScroll = (map) => {
         offset: 0.5,
         progress: true
     })
-    .onStepEnter(async response => {
+    .onStepEnter(response => {
         const element = response.element;
         const location = dummyData[response.index];
         const center = [location.longitude, location.latitude];
@@ -154,16 +128,10 @@ const initScroll = (map) => {
     });
 }
 
-const createFeatures = (features, photoUrl) => {
+const createFeatures = (feature, idx, photoUrl) => {
     const fragment = new DocumentFragment();
-
-    features.forEach((feature, idx) => {
-        const card = createCard(feature, idx, photoUrl);
-        console.log('card', card);
-
-        fragment.appendChild(card);
-    });
-
+    const card = createCard(feature, idx, photoUrl);
+    fragment.appendChild(card);
     featuresContainer.appendChild(fragment);
 };
 
@@ -171,7 +139,7 @@ const basePlacesAPIUrl = 'https://api.foursquare.com/v3/places';
 
 const getFSQPlacesMatch = async (feature) => {
     const fsqMatchURL = `${basePlacesAPIUrl}/match`;
-    const queryString = `?name=${encodeURIComponent(feature.localName)}&address=${encodeURIComponent(feature.address)}&city=Porto&cc=PT`;
+    const queryString = `?name=${encodeURIComponent(feature.localName)}&address=${encodeURIComponent(feature.address)}&city=${feature.city}&cc=${feature.cc}`;
     const queryPlacesAPIUrl = `${fsqMatchURL}${queryString}`;
     const placesData = await fetchFSQData(queryPlacesAPIUrl);
     return placesData;
@@ -197,17 +165,32 @@ const fetchFSQData = async (url) => {
 }
 
 const fetchLongerDescription = async (e) => {
-    console.log('longer description', e);
-    console.log('src', e.srcElement.dataset)
-    console.log('parent', e.srcElement.parentElement.dataset);
-    const name = e.srcElement.dataset.name || e.srcElement.parentElement.dataset.name;
-    const response = await openai.createCompletion({
-        model: "text-davinci-003",
-        prompt: `Tell me more about ${name}`,
-        temperature: 0,
-        max_tokens: 1000
-    });
-    console.log('response', response);
+    console.log('e', e);
+    const footerContent = e.srcElement;
+    const footer = footerContent.parentElement;
+    const footerProgressBar = footer.lastChild;
+    footerContent.style.display = 'none';
+    footerProgressBar.style.display = 'block';
+    const name = footer.dataset.name;
+    let text = '';
+    if (cachedLongerDescriptions[name]) {
+        text = cachedLongerDescriptions[name];
+    } else {
+        const response = await openai.createCompletion({
+            model: "text-davinci-003",
+            prompt: `Tell me more about ${name}`,
+            temperature: 0,
+            max_tokens: 2000
+        });
+        text = response.data.choices[0].text.trim();
+        cachedLongerDescriptions[name] = text;
+    }
+    footerContent.style.display = 'block';
+    footerProgressBar.style.display = 'none';
+    modal.classList.add('is-active');
+    const p = document.createElement('p');
+    p.innerText = text;
+    modalContent.appendChild(p);
 }
 
 const createCard = (feature, idx, photoUrl) => {
@@ -223,7 +206,7 @@ const createCard = (feature, idx, photoUrl) => {
     figure.classList.add('image', 'is-4by3');
 
     const image = document.createElement('img');
-    image.src = idx === 0 ? photoUrl : 'https://bulma.io/images/placeholders/1280x960.png';
+    image.src = photoUrl;
     image.alt = 'Placeholder text';
 
     figure.appendChild(image);
@@ -247,13 +230,23 @@ const createCard = (feature, idx, photoUrl) => {
     footer.setAttribute('data-name', feature.name);
     footer.classList.add('card-footer');
     footer.style.cursor = 'pointer';
+    footer.style.display = 'flex';
+    footer.style.justifyContent = 'center';
     
     const footerContent = document.createElement('p');
     footerContent.classList.add('card-footer-item');
     footerContent.innerText = `Click here to learn more about ${feature.name}`;
+    footerContent.addEventListener('click', fetchLongerDescription);
+
+    const footerProgressBar = document.createElement('progress');
+    footerProgressBar.classList.add('progress', 'is-large', 'is-info');
+    footerProgressBar.setAttribute('max', 100);
+    footerProgressBar.innerText = '60%';
+    footerProgressBar.style.display = 'none';
+    footerProgressBar.style.maxWidth = '50%';
 
     footer.appendChild(footerContent);
-    footer.addEventListener('click', fetchLongerDescription);
+    footer.appendChild(footerProgressBar);
 
     card.appendChild(cardImage);
     card.appendChild(cardContent);

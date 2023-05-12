@@ -27,6 +27,10 @@ a, a:hover, a:visited {
     background-color: #0071bc;
 }
 
+#loading-text {
+    display: none;
+}
+
 .progress {
     display: none;
     max-width: 25%;
@@ -75,7 +79,7 @@ a, a:hover, a:visited {
     z-index: 5;
 }
 #features {
-    padding-top: 10vh;
+    padding-top: 5vh;
     padding-bottom: 10vh;
 }
 .hidden {
